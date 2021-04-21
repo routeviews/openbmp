@@ -8,10 +8,12 @@
  */
 
 #include <iostream>
+#include <stdexcept>
 #include <netinet/in.h>
 #include <sys/time.h>
 #include <parsebgp.h>
 #include "Worker.h"
+
 
 Worker::Worker() {
     // get config instance
@@ -157,17 +159,35 @@ void Worker::work() {
                 /* CASE: INIT msg
                  *  should happen once normally unless the bmp router changes its information
                  *  this msg can contain router sysname, sysdesc. */
-                LOG_INFO("received init msg.");
+                LOG_INFO("received init msg: %s", router_ip.c_str());
                 router_init = true;
             } else if (parsed_bmp_msg->type == PARSEBGP_BMP_TYPE_TERM_MSG) {
                 /*
                  * CASE: TERM msg
                  * close tcp socket and stop working
                  */
-                LOG_INFO("received term msg.");
+                if (debug) LOG_INFO("received term msg: %s", router_ip.c_str());
                 router_init = false;
                 status = WORKER_STATUS_STOPPED;
-            }
+            } else if (parsed_bmp_msg->type == PARSEBGP_BMP_TYPE_PEER_UP) {
+		/*
+		 * CASE: PEER_UP
+		 *
+		 */
+		 if (debug) LOG_INFO("received peer up msg - router: %s, peer: %s", router_ip.c_str(), peer_ip.c_str());
+            } else if (parsed_bmp_msg->type == PARSEBGP_BMP_TYPE_PEER_DOWN) {
+		/*
+		 * CASE: PEER_DOWN
+		 *
+		 */
+		 if (debug) LOG_INFO("received peer down msg - router:  %s, peer: %s", router_ip.c_str(), peer_ip.c_str());
+            } else if (parsed_bmp_msg->type == PARSEBGP_BMP_TYPE_STATS_REPORT) {
+		/*
+		 * CASE: STATS_REPORT
+		 *
+		 */
+		 if (debug) LOG_INFO("received stats report msg. %s", router_ip.c_str());
+	    }
             // update buffer pointers
             update_buffer(raw_bmp_msg_len);
         } else if (err == PARSEBGP_PARTIAL_MSG) {
@@ -207,11 +227,17 @@ void Worker::refill_buffer(int recv_len) {
         received_bytes = recv(reader_fd,get_unread_buffer() + get_bmp_data_unread_len(),
                 recv_len,MSG_WAITALL);
         if (received_bytes <= 0) {
-            LOG_INFO("bad connection");
+            LOG_INFO("bad connection: %s", router_ip.c_str());
             // set worker status to stopped. the main thread will clean up later.
             status = WORKER_STATUS_STOPPED;
         }
         bmp_data_unread_len += received_bytes;
+    } else {
+	char err_msg [ 256 ];
+	sprintf(err_msg, "Buffer overflow for bmp_data_read_len %d bmp_data_unread_len %d  recv_len %d IP: %s",
+		bmp_data_read_len, bmp_data_unread_len, recv_len, router_ip.c_str());
+	LOG_ERR(err_msg);
+	throw std::overflow_error(err_msg);
     }
 
 }
