@@ -257,7 +257,7 @@ void Worker::update_buffer(int parsed_bmp_msg_len) {
     }
     assert(bmp_data_unread_len >= 0);
     if(bmp_data_unread_len < 0){
-        LOG_ERR("Assertion error. bmp_data_unread_len is invalid (%d)", bmp_data_read_len);
+        LOG_ERR("Assertion error. bmp_data_unread_len is invalid (%d)", bmp_data_unread_len);
     }
     assert(bmp_data_unread_len >= 0);
 }
